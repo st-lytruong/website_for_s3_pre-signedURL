@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S3 Pre-signed URL Lab</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">☁️</span>
+          <div>
+            <h1>S3 Pre-signed URL Lab</h1>
+            <p>AWS Lambda · API Gateway · S3</p>
+          </div>
+        </div>
+        <button class="config-toggle" id="configToggle" onclick="toggleConfig()">
+          ⚙️ Configuration
+        </button>
+      </div>
+    </header>
+
+    <!-- Config Panel -->
+    <div class="config-panel hidden" id="configPanel">
+      <div class="config-inner">
+        <h3>🔧 API Configuration</h3>
+        <div class="config-row">
+          <div class="form-group">
+            <label>API Gateway Base URL</label>
+            <input
+              type="text"
+              id="apiBaseUrl"
+              placeholder="https://xxxxxxxxxx.execute-api.ap-southeast-1.amazonaws.com/prod"
+            />
+          </div>
+          <div class="form-group">
+            <label>S3 Bucket Name <small>(optional, for display only)</small></label>
+            <input type="text" id="bucketName" placeholder="my-private-bucket" />
+          </div>
+        </div>
+        <div class="config-actions">
+          <button class="btn btn-primary" onclick="saveConfig()">💾 Save</button>
+          <span id="configStatus" class="config-status"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="section">
+      <h2 class="section-title">📐 Architecture Diagram</h2>
+      <div class="architecture">
+        <div class="arch-step">
+          <div class="arch-icon arch-browser">🌐</div>
+          <div class="arch-label">Browser</div>
+          <div class="arch-sublabel">Frontend</div>
+        </div>
+        <div class="arch-arrow">
+          <div class="arrow-line"></div>
+          <div class="arrow-label">① HTTP Request</div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-icon arch-apigw">🔀</div>
+          <div class="arch-label">API Gateway</div>
+          <div class="arch-sublabel">REST Endpoint</div>
+        </div>
+        <div class="arch-arrow">
+          <div class="arrow-line"></div>
+          <div class="arrow-label">② Invoke</div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-icon arch-lambda">λ</div>
+          <div class="arch-label">Lambda</div>
+          <div class="arch-sublabel">Generate URL</div>
+        </div>
+        <div class="arch-arrow">
+          <div class="arrow-line"></div>
+          <div class="arrow-label">③ Pre-signed URL</div>
+        </div>
+        <div class="arch-step">
+          <div class="arch-icon arch-s3">🪣</div>
+          <div class="arch-label">S3 Bucket</div>
+          <div class="arch-sublabel">Private Storage</div>
+        </div>
+      </div>
+      <p class="arch-note">
+        ④ Browser uses the pre-signed URL to <strong>download/upload directly</strong> to S3 (bypasses Lambda &amp; API Gateway)
+      </p>
+    </div>
+
+    <!-- Main Cards -->
+    <div class="main-grid">
+
+      <!-- ===== DOWNLOAD ===== -->
+      <div class="card">
+        <div class="card-header download-header">
+          <span class="card-icon">⬇️</span>
+          <div>
+            <h2>Download File</h2>
+            <p>Generate a pre-signed GET URL</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>S3 Object Key</label>
+            <input type="text" id="downloadKey" placeholder="images/photo.jpg" />
+          </div>
+          <div class="form-group">
+            <label>Expires in: <span id="downloadExpiryLabel" class="expiry-value">300s (5 min)</span></label>
+            <input type="range" id="downloadExpiry" min="60" max="3600" value="300"
+              oninput="updateExpiryLabel('download')" />
+          </div>
+          <button class="btn btn-download" onclick="generateDownloadUrl()" id="downloadBtn">
+            🔗 Generate Download URL
+          </button>
+
+          <div class="result-box" id="downloadResult" style="display:none;">
+            <div class="result-header">
+              <span>✅ Pre-signed URL Ready</span>
+              <span class="badge badge-green" id="downloadExpiryBadge"></span>
+            </div>
+            <textarea class="url-text" id="downloadUrl" readonly rows="4"></textarea>
+            <div class="action-row">
+              <button class="btn-sm btn-copy" onclick="copyUrl('downloadUrl')">📋 Copy URL</button>
+              <button class="btn-sm btn-open" onclick="openUrl('downloadUrl')">🔗 Open in Tab</button>
+              <button class="btn-sm btn-dl" onclick="downloadFile()">⬇️ Download</button>
+            </div>
+          </div>
+
+          <div class="error-box" id="downloadError" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- ===== UPLOAD ===== -->
+      <div class="card">
+        <div class="card-header upload-header">
+          <span class="card-icon">⬆️</span>
+          <div>
+            <h2>Upload File</h2>
+            <p>Generate a pre-signed PUT URL</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>S3 Object Key (destination)</label>
+            <input type="text" id="uploadKey" placeholder="uploads/myfile.jpg" />
+          </div>
+          <div class="form-group">
+            <label>Content-Type</label>
+            <select id="uploadContentType">
+              <option value="image/jpeg">image/jpeg</option>
+              <option value="image/png">image/png</option>
+              <option value="image/gif">image/gif</option>
+              <option value="application/pdf">application/pdf</option>
+              <option value="text/plain">text/plain</option>
+              <option value="application/json">application/json</option>
+              <option value="video/mp4">video/mp4</option>
+              <option value="application/octet-stream">application/octet-stream (binary)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Expires in: <span id="uploadExpiryLabel" class="expiry-value">300s (5 min)</span></label>
+            <input type="range" id="uploadExpiry" min="60" max="3600" value="300"
+              oninput="updateExpiryLabel('upload')" />
+          </div>
+          <button class="btn btn-upload" onclick="generateUploadUrl()" id="uploadBtn">
+            🔗 Generate Upload URL
+          </button>
+
+          <div class="result-box" id="uploadResult" style="display:none;">
+            <div class="result-header">
+              <span>✅ Pre-signed URL Ready</span>
+              <span class="badge badge-blue" id="uploadExpiryBadge"></span>
+            </div>
+            <textarea class="url-text" id="uploadUrl" readonly rows="4"></textarea>
+            <div class="action-row">
+              <button class="btn-sm btn-copy" onclick="copyUrl('uploadUrl')">📋 Copy URL</button>
+            </div>
+
+            <!-- Direct browser upload -->
+            <div class="direct-upload">
+              <h4>⚡ Upload Directly from Browser</h4>
+              <div class="drop-zone" id="dropZone"
+                ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+                <input type="file" id="fileInput" onchange="handleFileSelect(event)" />
+                <div class="drop-content" onclick="document.getElementById('fileInput').click()">
+                  <span class="drop-icon">📁</span>
+                  <p>Click to select or drag &amp; drop file here</p>
+                  <span id="selectedFileName" class="file-name-label"></span>
+                </div>
+              </div>
+              <button class="btn btn-send" id="uploadFileBtn" disabled onclick="uploadFileDirect()">
+                🚀 Upload to S3
+              </button>
+              <div class="progress-wrap" id="progressWrap" style="display:none;">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <span id="progressText">0%</span>
+              </div>
+              <div id="uploadFileStatus"></div>
+            </div>
+
+            <!-- Postman guide -->
+            <div class="postman-box">
+              <h4>📮 Using Postman</h4>
+              <ol>
+                <li>Copy the pre-signed URL above</li>
+                <li>New Request → Method: <code>PUT</code></li>
+                <li>Paste URL in the request URL bar</li>
+                <li>Headers → add <code>Content-Type</code>: <span id="postmanContentType" class="code-inline"></span></li>
+                <li>Body → <code>binary</code> → choose your file</li>
+                <li>Send → expect <code>200 OK</code></li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="error-box" id="uploadError" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Log -->
+    <div class="section">
+      <div class="log-toolbar">
+        <h2 class="section-title" style="margin:0">📋 API Response Log</h2>
+        <button class="btn-sm btn-clear" onclick="clearLog()">🗑️ Clear</button>
+      </div>
+      <div class="log-container" id="logContainer">
+        <div class="log-empty">No API calls yet — generate a pre-signed URL to see responses here.</div>
+      </div>
+    </div>
+
+  </div><!-- /.app -->
+
+  <script src="app.js"></script>
+</body>
+</html>
