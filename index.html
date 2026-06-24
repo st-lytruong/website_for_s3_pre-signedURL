@@ -22,14 +22,30 @@
           <p>Lab Demo</p>
         </div>
       </div>
-      <div class="aws-badge">
-        <span class="dot"></span>
-        AWS Lambda · API Gateway · S3
+      <div class="header-right">
+        <label class="mock-toggle" title="Use mock data — no real AWS needed">
+          <input type="checkbox" id="mock-switch" onchange="toggleMock(this.checked)" />
+          <span class="mock-track">
+            <span class="mock-thumb"></span>
+          </span>
+          <span class="mock-label">Mock mode</span>
+        </label>
+        <div class="aws-badge">
+          <span class="dot" id="conn-dot"></span>
+          <span id="conn-label">AWS Lambda · API Gateway · S3</span>
+        </div>
       </div>
     </div>
   </header>
 
   <main class="main">
+
+    <!-- Mock banner -->
+    <div class="mock-banner" id="mock-banner" style="display:none">
+      <span>🧪</span>
+      <strong>Mock Mode is ON</strong> — API calls are intercepted locally. No real AWS needed.
+      <span class="mock-tag">DEMO</span>
+    </div>
 
     <!-- ── Tabs ── -->
     <div class="tabs">

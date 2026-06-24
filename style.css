@@ -59,6 +59,8 @@ body {
 }
 .brand h1 { font-size: 15px; font-weight: 700; line-height: 1.2; }
 .brand p  { font-size: 11px; color: var(--muted); }
+.header-right { display: flex; align-items: center; gap: 10px; }
+
 .aws-badge {
   display: flex; align-items: center; gap: 6px;
   background: #f8fafc;
@@ -74,6 +76,57 @@ body {
   border-radius: 50%;
   background: #22c55e;
   box-shadow: 0 0 0 2px #bbf7d0;
+  transition: background .3s, box-shadow .3s;
+  flex-shrink: 0;
+}
+
+/* ── Mock toggle ──── */
+.mock-toggle {
+  display: flex; align-items: center; gap: 7px;
+  cursor: pointer; user-select: none;
+}
+.mock-toggle input { display: none; }
+.mock-track {
+  width: 36px; height: 20px;
+  background: #cbd5e1;
+  border-radius: 10px;
+  position: relative;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+.mock-toggle input:checked + .mock-track { background: #f59e0b; }
+.mock-thumb {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .2s;
+}
+.mock-toggle input:checked + .mock-track .mock-thumb { transform: translateX(16px); }
+.mock-label { font-size: 12px; font-weight: 600; color: var(--sub); }
+
+/* ── Mock banner ──── */
+.mock-banner {
+  display: flex; align-items: center; gap: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #78350f;
+  animation: slideUp .2s ease;
+}
+.mock-tag {
+  margin-left: auto;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  padding: 2px 7px;
+  border-radius: 4px;
 }
 
 /* ── Layout ──────────────────────────────── */
@@ -454,4 +507,5 @@ input[type="text"]:focus, select:focus {
   .field-row { grid-template-columns: 1fr; }
   .meta-grid { grid-template-columns: 1fr 1fr; }
   .aws-badge { display: none; }
+  .mock-label { display: none; }
 }
