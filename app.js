@@ -1,355 +1,359 @@
-/* ============================================
-   S3 Pre-signed URL Lab - JavaScript
-   ============================================ */
+/* ── S3 Pre-signed URL Demo ─────────────── */
 
-// ── State ──────────────────────────────────────
-let selectedFile = null;
-let currentUploadUrl = null;
-let currentDownloadUrl = null;
+let dlPresignedUrl  = null;
+let ulPresignedUrl  = null;
+let selectedFile    = null;
 
-// ── Config ─────────────────────────────────────
-function loadConfig() {
-  const url = localStorage.getItem('apiBaseUrl') || '';
-  const bucket = localStorage.getItem('bucketName') || '';
-  document.getElementById('apiBaseUrl').value = url;
-  document.getElementById('bucketName').value = bucket;
-  return { apiBaseUrl: url.replace(/\/$/, ''), bucketName: bucket };
+/* ════════════════════════════════════════
+   TAB SWITCH
+   ════════════════════════════════════════ */
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('panel-download').classList.toggle('hidden', tab !== 'download');
+  document.getElementById('panel-upload').classList.toggle('hidden', tab !== 'upload');
 }
 
-function saveConfig() {
-  const url = document.getElementById('apiBaseUrl').value.trim().replace(/\/$/, '');
-  const bucket = document.getElementById('bucketName').value.trim();
-  localStorage.setItem('apiBaseUrl', url);
-  localStorage.setItem('bucketName', bucket);
-  const status = document.getElementById('configStatus');
-  status.textContent = '✅ Saved!';
-  setTimeout(() => { status.textContent = ''; }, 2000);
-}
+/* ════════════════════════════════════════
+   DOWNLOAD — get pre-signed URL then auto-trigger
+   ════════════════════════════════════════ */
+async function doDownload() {
+  const api = document.getElementById('dl-api').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('dl-key').value.trim();
 
-function toggleConfig() {
-  const panel = document.getElementById('configPanel');
-  panel.classList.toggle('hidden');
-}
+  clearErr('dl-error');
+  hideResult('dl-result');
 
-// ── Expiry label ───────────────────────────────
-function updateExpiryLabel(type) {
-  const val = parseInt(document.getElementById(`${type}Expiry`).value);
-  const mins = Math.floor(val / 60);
-  const secs = val % 60;
-  let label = `${val}s`;
-  if (mins > 0) label += ` (${mins}m${secs > 0 ? secs + 's' : ''})`;
-  document.getElementById(`${type}ExpiryLabel`).textContent = label;
-}
+  if (!api) return showErr('dl-error', 'Paste your API Gateway URL above.');
+  if (!key) return showErr('dl-error', 'Enter the S3 Object Key of the file to download.');
 
-// ── Generate Download URL ──────────────────────
-async function generateDownloadUrl() {
-  const { apiBaseUrl } = loadConfig();
-  const key = document.getElementById('downloadKey').value.trim();
-  const expiry = document.getElementById('downloadExpiry').value;
-
-  hideEl('downloadResult');
-  hideEl('downloadError');
-
-  if (!apiBaseUrl) return showError('downloadError', '⚠️ Please set your API Gateway URL in Configuration.');
-  if (!key) return showError('downloadError', '⚠️ Please enter an S3 Object Key.');
-
-  const btn = document.getElementById('downloadBtn');
+  const btn = document.getElementById('dl-btn');
   setLoading(btn, true);
 
   try {
-    const endpoint = `${apiBaseUrl}/presign/download`;
-    const body = { key, expiresIn: parseInt(expiry) };
-
-    addLog('POST', endpoint, body);
-
-    const res = await fetch(endpoint, {
+    const body = { key, expiresIn: 300 };
+    const res  = await fetch(api, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    updateLog(res.status, data);
+    const raw  = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = { raw }; }
 
-    if (!res.ok) {
-      throw new Error(data.message || data.error || `HTTP ${res.status}`);
-    }
+    logResponse('POST', api, body, res.status, data);
 
-    const presignedUrl = data.url || data.presignedUrl || data.downloadUrl || data.signedUrl;
-    if (!presignedUrl) throw new Error('No URL found in response. Check Lambda response format.');
+    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
 
-    currentDownloadUrl = presignedUrl;
-    document.getElementById('downloadUrl').value = presignedUrl;
+    const url = extractUrl(data);
+    if (!url) throw new Error('Cannot find a URL in the response. Check Lambda output format.');
 
-    const expiryVal = parseInt(expiry);
-    document.getElementById('downloadExpiryBadge').textContent = `Expires in ${expiryVal}s`;
-    showEl('downloadResult');
+    dlPresignedUrl = url;
+    renderResult('dl', url, data, key, 'GET');
 
-  } catch (err) {
-    showError('downloadError', `❌ Error: ${err.message}`);
+  } catch (e) {
+    showErr('dl-error', e.message);
   } finally {
     setLoading(btn, false);
   }
 }
 
-// ── Generate Upload URL ────────────────────────
-async function generateUploadUrl() {
-  const { apiBaseUrl } = loadConfig();
-  const key = document.getElementById('uploadKey').value.trim();
-  const contentType = document.getElementById('uploadContentType').value;
-  const expiry = document.getElementById('uploadExpiry').value;
+function triggerDownload() {
+  if (!dlPresignedUrl) return;
+  const a = document.createElement('a');
+  a.href = dlPresignedUrl;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
-  hideEl('uploadResult');
-  hideEl('uploadError');
+/* ════════════════════════════════════════
+   UPLOAD — get pre-signed URL
+   ════════════════════════════════════════ */
+async function doUpload() {
+  const api = document.getElementById('ul-api').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('ul-key').value.trim();
+  const ct  = document.getElementById('ul-ct').value;
 
-  if (!apiBaseUrl) return showError('uploadError', '⚠️ Please set your API Gateway URL in Configuration.');
-  if (!key) return showError('uploadError', '⚠️ Please enter an S3 Object Key (destination path).');
+  clearErr('ul-error');
+  hideResult('ul-result');
 
-  const btn = document.getElementById('uploadBtn');
+  if (!api) return showErr('ul-error', 'Paste your API Gateway URL above.');
+  if (!key) return showErr('ul-error', 'Enter the S3 Object Key (destination path).');
+
+  const btn = document.getElementById('ul-btn');
   setLoading(btn, true);
 
   try {
-    const endpoint = `${apiBaseUrl}/presign/upload`;
-    const body = { key, contentType, expiresIn: parseInt(expiry) };
-
-    addLog('POST', endpoint, body);
-
-    const res = await fetch(endpoint, {
+    const body = { key, contentType: ct, expiresIn: 300 };
+    const res  = await fetch(api, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    updateLog(res.status, data);
+    const raw  = await res.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = { raw }; }
 
-    if (!res.ok) {
-      throw new Error(data.message || data.error || `HTTP ${res.status}`);
-    }
+    logResponse('POST', api, body, res.status, data);
 
-    const presignedUrl = data.url || data.presignedUrl || data.uploadUrl || data.signedUrl;
-    if (!presignedUrl) throw new Error('No URL found in response. Check Lambda response format.');
+    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
 
-    currentUploadUrl = presignedUrl;
-    document.getElementById('uploadUrl').value = presignedUrl;
+    const url = extractUrl(data);
+    if (!url) throw new Error('Cannot find a URL in the response. Check Lambda output format.');
 
-    const expiryVal = parseInt(expiry);
-    document.getElementById('uploadExpiryBadge').textContent = `Expires in ${expiryVal}s`;
-    document.getElementById('postmanContentType').textContent = contentType;
+    ulPresignedUrl = url;
 
-    // Reset file selection
+    // Update Postman hint
+    document.getElementById('ul-ct-hint').textContent = ct;
+
+    renderResult('ul', url, data, key, 'PUT');
+
+    // Reset upload state
     selectedFile = null;
-    document.getElementById('selectedFileName').textContent = '';
-    document.getElementById('uploadFileBtn').disabled = true;
-    document.getElementById('fileInput').value = '';
-    hideEl('progressWrap');
-    document.getElementById('uploadFileStatus').textContent = '';
+    document.getElementById('ul-file').value = '';
+    document.getElementById('drop-text').textContent = 'Click or drag file here';
+    document.getElementById('ul-send-btn').disabled = true;
+    document.getElementById('ul-status').textContent = '';
+    document.getElementById('ul-status').className = '';
+    hide('progress-row');
 
-    showEl('uploadResult');
-
-  } catch (err) {
-    showError('uploadError', `❌ Error: ${err.message}`);
+  } catch (e) {
+    showErr('ul-error', e.message);
   } finally {
     setLoading(btn, false);
   }
 }
 
-// ── File Selection ─────────────────────────────
-function handleFileSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  selectedFile = file;
-  document.getElementById('selectedFileName').textContent = `📄 ${file.name} (${formatBytes(file.size)})`;
-  document.getElementById('uploadFileBtn').disabled = false;
+/* ════════════════════════════════════════
+   RENDER RESULT + META
+   ════════════════════════════════════════ */
+function renderResult(prefix, url, data, key, method) {
+  // Fill URL textarea
+  document.getElementById(`${prefix}-url-box`).value = url;
+
+  // Parse URL params
+  const parsed  = parsePresignedUrl(url);
+  const expSecs = parsed.expires ? parseInt(parsed.expires) : 300;
+  const expMin  = Math.round(expSecs / 60);
+
+  // Build meta items
+  const meta = [
+    { key: 'HTTP Method', val: method,                        cls: method === 'GET' ? 'blue' : 'green' },
+    { key: 'Object Key',  val: key,                           cls: 'mono' },
+    { key: 'Bucket',      val: parsed.bucket || extractBucket(url), cls: 'mono' },
+    { key: 'Region',      val: parsed.region || '—',          cls: '' },
+    { key: 'Algorithm',   val: parsed.algorithm || '—',       cls: 'mono' },
+    { key: 'Expires In',  val: `${expSecs}s (${expMin} min)`, cls: 'orange' },
+    { key: 'Credential',  val: parsed.credential ? truncate(parsed.credential, 28) : '—', cls: 'mono' },
+    { key: 'Signed At',   val: parsed.date ? formatDate(parsed.date) : new Date().toLocaleTimeString(), cls: '' },
+  ];
+
+  const grid = document.getElementById(`${prefix}-meta`);
+  grid.innerHTML = meta.map(m => `
+    <div class="meta-item">
+      <div class="meta-key">${m.key}</div>
+      <div class="meta-val ${m.cls}">${m.val}</div>
+    </div>`).join('');
+
+  showResult(`${prefix}-result`);
 }
 
-function onDragOver(e) {
-  e.preventDefault();
-  document.getElementById('dropZone').classList.add('dragover');
-}
-function onDragLeave(e) {
-  document.getElementById('dropZone').classList.remove('dragover');
-}
-function onDrop(e) {
-  e.preventDefault();
-  document.getElementById('dropZone').classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  selectedFile = file;
-  document.getElementById('selectedFileName').textContent = `📄 ${file.name} (${formatBytes(file.size)})`;
-  document.getElementById('uploadFileBtn').disabled = false;
+/* ════════════════════════════════════════
+   DIRECT UPLOAD TO S3
+   ════════════════════════════════════════ */
+function onFileChange(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  selectedFile = f;
+  document.getElementById('drop-text').textContent = `${f.name}  (${fmtBytes(f.size)})`;
+  document.getElementById('ul-send-btn').disabled = false;
 }
 
-// ── Upload directly to S3 via pre-signed URL ───
-async function uploadFileDirect() {
-  if (!selectedFile || !currentUploadUrl) return;
+// Drag & drop
+const dz = document.getElementById ? null : null; // set after DOM load
+function initDrop() {
+  const zone = document.getElementById('drop-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('over');
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    selectedFile = f;
+    document.getElementById('drop-text').textContent = `${f.name}  (${fmtBytes(f.size)})`;
+    document.getElementById('ul-send-btn').disabled = false;
+  });
+}
 
-  const contentType = document.getElementById('uploadContentType').value;
-  const btn = document.getElementById('uploadFileBtn');
-  const statusEl = document.getElementById('uploadFileStatus');
+async function sendUpload() {
+  if (!selectedFile || !ulPresignedUrl) return;
+
+  const ct     = document.getElementById('ul-ct').value;
+  const btn    = document.getElementById('ul-send-btn');
+  const status = document.getElementById('ul-status');
 
   btn.disabled = true;
-  statusEl.textContent = '';
-  showEl('progressWrap');
-  setProgress(0);
+  status.textContent = '';
+  status.className   = '';
+  show('progress-row');
+  setBar(0);
 
   try {
-    await uploadWithProgress(currentUploadUrl, selectedFile, contentType, (pct) => {
-      setProgress(pct);
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', ulPresignedUrl);
+      xhr.setRequestHeader('Content-Type', ct);
+      xhr.upload.onprogress = ev => {
+        if (ev.lengthComputable) setBar(Math.round(ev.loaded / ev.total * 100));
+      };
+      xhr.onload  = () => xhr.status < 300 ? resolve() : reject(new Error(`S3 returned HTTP ${xhr.status}`));
+      xhr.onerror = ()  => reject(new Error('Network error'));
+      xhr.send(selectedFile);
     });
 
-    setProgress(100);
-    statusEl.innerHTML = `<span style="color:var(--green)">✅ Upload successful! File is now in S3.</span>`;
-    addLog('PUT (direct to S3)', currentUploadUrl.split('?')[0] + '?[signature]', { file: selectedFile.name, size: formatBytes(selectedFile.size) });
-    updateLog(200, { message: 'Upload to S3 successful', file: selectedFile.name });
+    setBar(100);
+    status.textContent = '✓ Upload successful';
+    status.className   = 'ok';
+    logResponse('PUT (S3 direct)', ulPresignedUrl.split('?')[0], { file: selectedFile.name, size: fmtBytes(selectedFile.size) }, 200, { message: 'Upload successful' });
 
-  } catch (err) {
-    statusEl.innerHTML = `<span style="color:var(--red)">❌ Upload failed: ${err.message}</span>`;
+  } catch (e) {
+    status.textContent = `✗ ${e.message}`;
+    status.className   = 'err';
   } finally {
     btn.disabled = false;
   }
 }
 
-function uploadWithProgress(url, file, contentType, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Type', contentType);
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`S3 returned HTTP ${xhr.status}: ${xhr.responseText || 'No response body'}`));
-    };
-    xhr.onerror = () => reject(new Error('Network error during upload'));
-    xhr.send(file);
-  });
+function setBar(pct) {
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct + '%';
 }
 
-function setProgress(pct) {
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressText').textContent = pct + '%';
+/* ════════════════════════════════════════
+   COPY URL
+   ════════════════════════════════════════ */
+function copyText(id) {
+  const text = document.getElementById(id).value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard'));
 }
 
-// ── Download helpers ───────────────────────────
-function downloadFile() {
-  if (!currentDownloadUrl) return;
-  const a = document.createElement('a');
-  a.href = currentDownloadUrl;
-  a.download = '';
-  a.click();
-}
-
-function openUrl(id) {
-  const url = document.getElementById(id).value;
-  if (url) window.open(url, '_blank');
-}
-
-function copyUrl(id) {
-  const url = document.getElementById(id).value;
-  if (!url) return;
-  navigator.clipboard.writeText(url).then(() => {
-    showToast('📋 Copied to clipboard!');
-  });
-}
-
-// ── Toast ──────────────────────────────────────
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.textContent = msg;
-  t.style.cssText = `
-    position:fixed; bottom:24px; right:24px; z-index:9999;
-    background:#1e2235; border:1px solid #6366f1;
-    color:#e2e8f0; padding:10px 18px; border-radius:8px;
-    font-size:13px; font-weight:600;
-    animation: fadeIn .2s ease;
-  `;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2000);
-}
-
-// ── API Log ────────────────────────────────────
-let _lastLogEntry = null;
-
-function addLog(method, url, body) {
-  const container = document.getElementById('logContainer');
-  const empty = container.querySelector('.log-empty');
-  if (empty) empty.remove();
-
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-
-  const methodClass = method.startsWith('GET') ? 'log-get' : 'log-post';
-  const now = new Date().toLocaleTimeString();
-
-  entry.innerHTML = `
-    <div>
-      <span class="log-time">${now}</span>
-      <span class="log-method ${methodClass}">${method}</span>
-      <span class="log-url">${url}</span>
-    </div>
-    <div class="log-body">${JSON.stringify(body, null, 2)}</div>
-    <div class="log-status" id="logStatus_${Date.now()}">⏳ Waiting for response...</div>
-  `;
-
-  container.prepend(entry);
-  _lastLogEntry = entry;
-}
-
-function updateLog(status, data) {
-  if (!_lastLogEntry) return;
-  const statusEl = _lastLogEntry.querySelector('[id^="logStatus_"]');
-  if (!statusEl) return;
-
+/* ════════════════════════════════════════
+   RAW RESPONSE LOG
+   ════════════════════════════════════════ */
+function logResponse(method, url, reqBody, status, resBody) {
   const ok = status >= 200 && status < 300;
-  statusEl.className = `log-status ${ok ? 'log-ok' : 'log-err'}`;
-  statusEl.textContent = `${ok ? '✅' : '❌'} HTTP ${status}`;
+  const out = [
+    `[${new Date().toLocaleTimeString()}]  ${method}  ${status} ${ok ? 'OK' : 'ERROR'}`,
+    `Endpoint : ${url}`,
+    `Request  : ${JSON.stringify(reqBody)}`,
+    `Response : ${JSON.stringify(resBody, null, 2)}`,
+    '─'.repeat(60),
+  ].join('\n');
 
-  // Append response body
-  const bodyEl = document.createElement('div');
-  bodyEl.className = 'log-body';
-  bodyEl.style.marginTop = '6px';
-  bodyEl.style.borderColor = ok ? 'var(--green-dim)' : 'var(--red-dim)';
-  bodyEl.textContent = JSON.stringify(data, null, 2);
-  _lastLogEntry.appendChild(bodyEl);
+  const pre = document.getElementById('log-body');
+  pre.textContent = out + (pre.textContent === '— no requests yet —' ? '' : '\n\n' + pre.textContent);
 }
-
 function clearLog() {
-  document.getElementById('logContainer').innerHTML =
-    '<div class="log-empty">No API calls yet — generate a pre-signed URL to see responses here.</div>';
+  document.getElementById('log-body').textContent = '— no requests yet —';
 }
 
-// ── Utilities ──────────────────────────────────
-function showEl(id) { document.getElementById(id).style.display = 'block'; }
-function hideEl(id) { document.getElementById(id).style.display = 'none'; }
+/* ════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════ */
+function extractUrl(data) {
+  return data?.url || data?.presignedUrl || data?.uploadUrl || data?.downloadUrl || data?.signedUrl || null;
+}
 
-function showError(id, msg) {
+function parsePresignedUrl(url) {
+  try {
+    const u      = new URL(url);
+    const params = Object.fromEntries(u.searchParams);
+    // Bucket from hostname: bucket.s3.region.amazonaws.com  OR  s3.region.amazonaws.com/bucket
+    let bucket = '', region = '';
+    const host = u.hostname; // e.g. mybucket.s3.ap-southeast-1.amazonaws.com
+    const m1   = host.match(/^(.+?)\.s3[.-]([a-z0-9-]+)\.amazonaws\.com$/);
+    const m2   = host.match(/^s3[.-]([a-z0-9-]+)\.amazonaws\.com$/);
+    if (m1) { bucket = m1[1]; region = m1[2]; }
+    else if (m2) { region = m2[1]; bucket = u.pathname.split('/')[1]; }
+
+    const cred = params['X-Amz-Credential'] || params['x-amz-credential'] || '';
+    const algo = params['X-Amz-Algorithm'] || params['x-amz-algorithm'] || '';
+    const date = params['X-Amz-Date']      || params['x-amz-date']      || '';
+    const exp  = params['X-Amz-Expires']   || params['x-amz-expires']   || '';
+
+    return { bucket, region, credential: cred, algorithm: algo, date, expires: exp };
+  } catch { return {}; }
+}
+
+function extractBucket(url) {
+  try {
+    const host = new URL(url).hostname;
+    const m = host.match(/^(.+?)\.s3/);
+    return m ? m[1] : '—';
+  } catch { return '—'; }
+}
+
+function formatDate(amzDate) {
+  // 20240612T093000Z  →  2024-06-12 09:30:00 UTC
+  try {
+    const d = amzDate.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3 $4:$5:$6 UTC');
+    return d;
+  } catch { return amzDate; }
+}
+
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function showResult(id) {
   const el = document.getElementById(id);
-  el.textContent = msg;
-  el.style.display = 'block';
+  el.style.display = 'flex';
+  el.classList.add('visible');
+}
+function hideResult(id) {
+  const el = document.getElementById(id);
+  if (el) { el.style.display = 'none'; el.classList.remove('visible'); }
+}
+function show(id) { const el = document.getElementById(id); if (el) el.style.display = 'flex'; }
+function hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
+function clearErr(id)     { const el = document.getElementById(id); el.textContent = ''; el.style.display = 'none'; }
+
+function setLoading(btn, on) {
+  btn.classList.toggle('loading', on);
+  btn.disabled = on;
 }
 
-function setLoading(btn, loading) {
-  if (loading) {
-    btn.classList.add('loading');
-    btn.disabled = true;
-  } else {
-    btn.classList.remove('loading');
-    btn.disabled = false;
-  }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-function formatBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-// ── Init ───────────────────────────────────────
+/* ── Init ───────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  loadConfig();
-  updateExpiryLabel('download');
-  updateExpiryLabel('upload');
+  // Restore saved API URLs
+  const dlSaved = localStorage.getItem('dl-api');
+  const ulSaved = localStorage.getItem('ul-api');
+  if (dlSaved) document.getElementById('dl-api').value = dlSaved;
+  if (ulSaved) document.getElementById('ul-api').value = ulSaved;
+
+  // Auto-save on change
+  document.getElementById('dl-api').addEventListener('input', e =>
+    localStorage.setItem('dl-api', e.target.value));
+  document.getElementById('ul-api').addEventListener('input', e =>
+    localStorage.setItem('ul-api', e.target.value));
+
+  initDrop();
 });
