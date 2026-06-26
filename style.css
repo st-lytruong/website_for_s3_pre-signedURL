@@ -458,6 +458,157 @@ input[type="text"]:focus, select:focus {
   font-size: 11.5px;
 }
 
+/* ── Comparison grid ─────────────────────── */
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 700px) { .compare-grid { grid-template-columns: 1fr; } }
+
+.compare-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.col-deny { border-top: 3px solid #f87171; }
+.col-allow { border-top: 3px solid #4ade80; }
+
+.col-header { display: flex; flex-direction: column; gap: 4px; }
+.col-badge {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  width: fit-content;
+  letter-spacing: .02em;
+}
+.badge-deny  { background: #fee2e2; color: #991b1b; }
+.badge-allow { background: #dcfce7; color: #166534; }
+.col-desc { font-size: 12px; color: var(--muted); }
+
+/* URL preview in columns */
+.col-url-preview {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.url-preview-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+.col-url-preview code {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #1d4ed8;
+  word-break: break-all;
+  line-height: 1.5;
+}
+.col-url-preview textarea {
+  background: transparent;
+  border: none;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #1d4ed8;
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+  width: 100%;
+}
+
+/* Compare buttons */
+.btn-compare {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%;
+  height: 38px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s, box-shadow .15s;
+}
+.btn-compare:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+.btn-compare:disabled { opacity: .5; cursor: not-allowed; }
+.btn-deny   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.btn-deny:hover:not(:disabled) { background: #fecaca; }
+.btn-allow  { background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,.3); }
+.btn-allow.btn-green { background: linear-gradient(135deg,#16a34a,#22c55e); box-shadow: 0 2px 8px rgba(34,197,94,.3); }
+.btn-orange { background: linear-gradient(135deg,#ea580c,#f97316); color: #fff; box-shadow: 0 2px 8px rgba(249,115,22,.3); }
+
+/* Loading on compare buttons */
+.btn-compare.loading { opacity: .65; pointer-events: none; }
+.btn-compare.loading::after {
+  content: '';
+  width: 13px; height: 13px;
+  border: 2px solid rgba(0,0,0,.15);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin .65s linear infinite;
+  margin-left: 4px;
+}
+.btn-deny.loading::after { border-top-color: #991b1b; }
+
+/* Compare result card */
+.compare-result {
+  flex-direction: column;
+  gap: 8px;
+  animation: slideUp .2s ease;
+}
+.cmp-status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-weight: 700;
+}
+.cmp-denied { background: #fee2e2; color: #991b1b; }
+.cmp-ok     { background: #dcfce7; color: #166534; }
+.cmp-code   { font-size: 15px; font-family: 'Courier New', monospace; }
+.cmp-label  { font-size: 12px; }
+.cmp-body {
+  background: #0f172a;
+  color: #a5f3fc;
+  font-family: 'Courier New', monospace;
+  font-size: 11.5px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+.cmp-explain {
+  font-size: 12px;
+  color: var(--sub);
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  line-height: 1.6;
+}
+.cmp-explain strong { color: var(--text); }
+.cmp-explain code {
+  background: var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.url-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* ── Log ─────────────────────────────────── */
 .log-wrap {
   background: var(--white);

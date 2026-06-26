@@ -25,9 +25,7 @@
       <div class="header-right">
         <label class="mock-toggle" title="Use mock data — no real AWS needed">
           <input type="checkbox" id="mock-switch" onchange="toggleMock(this.checked)" />
-          <span class="mock-track">
-            <span class="mock-thumb"></span>
-          </span>
+          <span class="mock-track"><span class="mock-thumb"></span></span>
           <span class="mock-label">Mock mode</span>
         </label>
         <div class="aws-badge">
@@ -43,26 +41,28 @@
     <!-- Mock banner -->
     <div class="mock-banner" id="mock-banner" style="display:none">
       <span>🧪</span>
-      <strong>Mock Mode is ON</strong> — API calls are intercepted locally. No real AWS needed.
+      <strong>Mock Mode is ON</strong> — All requests are intercepted locally. No real AWS needed.
       <span class="mock-tag">DEMO</span>
     </div>
 
     <!-- ── Tabs ── -->
     <div class="tabs">
       <button class="tab active" data-tab="download" onclick="switchTab('download')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download
       </button>
       <button class="tab" data-tab="upload" onclick="switchTab('upload')">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload
       </button>
     </div>
 
-    <!-- ════════ DOWNLOAD PANEL ════════ -->
+    <!-- ════════════════════════════════════
+         DOWNLOAD PANEL
+    ════════════════════════════════════ -->
     <div class="panel" id="panel-download">
 
-      <!-- Input form -->
+      <!-- Config form -->
       <div class="form-card">
         <div class="field">
           <label>API Gateway URL</label>
@@ -72,48 +72,72 @@
           <label>S3 Object Key</label>
           <input type="text" id="dl-key" placeholder="folder/photo.jpg" autocomplete="off" />
         </div>
-        <button class="btn-primary" id="dl-btn" onclick="doDownload()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Get Pre-signed URL
-        </button>
         <div class="error-msg" id="dl-error"></div>
       </div>
 
-      <!-- Result -->
-      <div class="result-panel" id="dl-result">
+      <!-- ── Comparison ── -->
+      <div class="compare-grid">
 
-        <div class="result-header">
-          <div class="result-title">
-            <span class="status-dot green"></span>
-            Pre-signed URL Generated
+        <!-- LEFT: Without pre-signed URL -->
+        <div class="compare-col col-deny">
+          <div class="col-header">
+            <span class="col-badge badge-deny">Without Pre-signed URL</span>
+            <p class="col-desc">Direct GET to S3 — no authentication</p>
           </div>
-          <div class="result-actions">
-            <button class="chip" onclick="copyText('dl-url-box')">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              Copy URL
-            </button>
-            <button class="chip chip-blue" onclick="triggerDownload()">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download File
-            </button>
+          <div class="col-url-preview" id="dl-raw-url-preview">
+            <span class="url-preview-label">Request URL</span>
+            <code id="dl-raw-url-text">https://&lt;bucket&gt;.s3.&lt;region&gt;.amazonaws.com/&lt;key&gt;</code>
+          </div>
+          <button class="btn-compare btn-deny" id="dl-no-btn" onclick="tryWithoutPresign('download')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Try Without Pre-signed URL
+          </button>
+          <div class="compare-result" id="dl-no-result" style="display:none"></div>
+        </div>
+
+        <!-- RIGHT: With pre-signed URL -->
+        <div class="compare-col col-allow">
+          <div class="col-header">
+            <span class="col-badge badge-allow">With Pre-signed URL</span>
+            <p class="col-desc">Lambda generates a signed URL via API Gateway</p>
+          </div>
+          <div class="col-url-preview" id="dl-signed-url-preview" style="display:none">
+            <span class="url-preview-label">Pre-signed URL</span>
+            <textarea id="dl-url-box" readonly rows="3"></textarea>
+          </div>
+          <button class="btn-compare btn-allow" id="dl-btn" onclick="doDownload()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Get Pre-signed URL &amp; Download
+          </button>
+          <div class="compare-result" id="dl-yes-result" style="display:none"></div>
+
+          <!-- Meta grid — shown after getting URL -->
+          <div class="meta-grid" id="dl-meta" style="display:none"></div>
+
+          <!-- Download action -->
+          <div id="dl-download-actions" style="display:none">
+            <div class="url-actions">
+              <button class="chip" onclick="copyText('dl-url-box')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy URL
+              </button>
+              <button class="chip chip-blue" onclick="triggerDownload()">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download File
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- URL box -->
-        <div class="url-box">
-          <textarea id="dl-url-box" readonly></textarea>
-        </div>
-
-        <!-- Metadata grid -->
-        <div class="meta-grid" id="dl-meta"></div>
-
-      </div>
+      </div><!-- /.compare-grid -->
     </div>
 
-    <!-- ════════ UPLOAD PANEL ════════ -->
+    <!-- ════════════════════════════════════
+         UPLOAD PANEL
+    ════════════════════════════════════ -->
     <div class="panel hidden" id="panel-upload">
 
-      <!-- Input form -->
+      <!-- Config form -->
       <div class="form-card">
         <div class="field">
           <label>API Gateway URL</label>
@@ -121,7 +145,7 @@
         </div>
         <div class="field-row">
           <div class="field">
-            <label>S3 Object Key</label>
+            <label>S3 Object Key (destination)</label>
             <input type="text" id="ul-key" placeholder="uploads/myfile.jpg" autocomplete="off" />
           </div>
           <div class="field field-sm">
@@ -135,70 +159,85 @@
             </select>
           </div>
         </div>
-        <button class="btn-primary btn-green" id="ul-btn" onclick="doUpload()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Get Pre-signed URL
-        </button>
         <div class="error-msg" id="ul-error"></div>
       </div>
 
-      <!-- Result -->
-      <div class="result-panel" id="ul-result">
+      <!-- ── Comparison ── -->
+      <div class="compare-grid">
 
-        <div class="result-header">
-          <div class="result-title">
-            <span class="status-dot green"></span>
-            Pre-signed URL Generated
+        <!-- LEFT: Without pre-signed URL -->
+        <div class="compare-col col-deny">
+          <div class="col-header">
+            <span class="col-badge badge-deny">Without Pre-signed URL</span>
+            <p class="col-desc">Direct PUT to S3 — no authentication</p>
           </div>
-          <button class="chip" onclick="copyText('ul-url-box')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy URL
+          <div class="col-url-preview">
+            <span class="url-preview-label">Request URL</span>
+            <code id="ul-raw-url-text">https://&lt;bucket&gt;.s3.&lt;region&gt;.amazonaws.com/&lt;key&gt;</code>
+          </div>
+          <button class="btn-compare btn-deny" id="ul-no-btn" onclick="tryWithoutPresign('upload')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Try Without Pre-signed URL
           </button>
+          <div class="compare-result" id="ul-no-result" style="display:none"></div>
         </div>
 
-        <div class="url-box">
-          <textarea id="ul-url-box" readonly></textarea>
-        </div>
+        <!-- RIGHT: With pre-signed URL -->
+        <div class="compare-col col-allow">
+          <div class="col-header">
+            <span class="col-badge badge-allow">With Pre-signed URL</span>
+            <p class="col-desc">Lambda generates a signed URL via API Gateway</p>
+          </div>
+          <div class="col-url-preview" id="ul-signed-url-preview" style="display:none">
+            <span class="url-preview-label">Pre-signed URL</span>
+            <textarea id="ul-url-box" readonly rows="3"></textarea>
+          </div>
+          <button class="btn-compare btn-allow btn-green" id="ul-btn" onclick="doUpload()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Get Pre-signed URL
+          </button>
+          <div class="compare-result" id="ul-yes-result" style="display:none"></div>
 
-        <div class="meta-grid" id="ul-meta"></div>
+          <div class="meta-grid" id="ul-meta" style="display:none"></div>
 
-        <!-- File upload -->
-        <div class="upload-section">
-          <div class="section-label">Upload File to S3</div>
-          <label class="drop-zone" id="drop-zone">
-            <input type="file" id="ul-file" onchange="onFileChange(event)" />
-            <div class="drop-inner" id="drop-inner">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span id="drop-text">Click or drag file here</span>
+          <!-- Upload area — shown after getting URL -->
+          <div id="ul-upload-area" style="display:none">
+            <div class="url-actions" style="margin-bottom:10px">
+              <button class="chip" onclick="copyText('ul-url-box')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy URL
+              </button>
             </div>
-          </label>
-
-          <button class="btn-primary btn-orange" id="ul-send-btn" disabled onclick="sendUpload()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Upload to S3
-          </button>
-
-          <div class="progress-row" id="progress-row" style="display:none">
-            <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
-            <span id="progress-pct">0%</span>
+            <label class="drop-zone" id="drop-zone">
+              <input type="file" id="ul-file" onchange="onFileChange(event)" />
+              <div class="drop-inner">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span id="drop-text">Click or drag file here</span>
+              </div>
+            </label>
+            <button class="btn-compare btn-orange" id="ul-send-btn" disabled onclick="sendUpload()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Upload to S3
+            </button>
+            <div class="progress-row" id="progress-row" style="display:none">
+              <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+              <span id="progress-pct">0%</span>
+            </div>
+            <div id="ul-status"></div>
+            <div class="hint-box" style="margin-top:10px">
+              <span class="hint-label">Postman</span>
+              Method <code>PUT</code> · paste URL · Header <code>Content-Type: <span id="ul-ct-hint"></span></code> · Body → binary → Send
+            </div>
           </div>
-
-          <div id="ul-status"></div>
         </div>
 
-        <!-- Postman hint -->
-        <div class="hint-box">
-          <span class="hint-label">Postman</span>
-          Method <code>PUT</code> · paste URL · Header <code>Content-Type: <span id="ul-ct-hint"></span></code> · Body → binary → choose file · Send
-        </div>
-
-      </div>
+      </div><!-- /.compare-grid -->
     </div>
 
     <!-- ── Raw response log ── -->
     <div class="log-wrap">
       <div class="log-top">
-        <span class="log-title">Raw API Response</span>
+        <span class="log-title">Raw API Response Log</span>
         <button class="chip" onclick="clearLog()">Clear</button>
       </div>
       <pre id="log-body" class="log-pre">— no requests yet —</pre>
@@ -208,7 +247,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="app.js"></script>
 </body>
 </html>
